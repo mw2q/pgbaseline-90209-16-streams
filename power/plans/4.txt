@@ -1,0 +1,42 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	o_orderpriority,
+	count(*) as order_count
+from
+	orders
+where
+	o_orderdate >= date '1994-03-01'
+	and o_orderdate < cast(date '1994-03-01' + interval '3 month' as date)
+	and exists (
+		select
+			*
+		from
+			lineitem
+		where
+			l_orderkey = o_orderkey
+			and l_commitdate < l_receiptdate
+	)
+group by
+	o_orderpriority
+order by
+	o_orderpriority;
+                                                               QUERY PLAN                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=1285103.41..1285103.42 rows=1 width=16)
+   Sort Key: orders.o_orderpriority
+   ->  HashAggregate  (cost=1285103.39..1285103.40 rows=1 width=16)
+         ->  Hash Join  (cost=1016981.76..1284330.12 rows=154655 width=16)
+               Hash Cond: (orders.o_orderkey = lineitem.l_orderkey)
+               ->  Bitmap Heap Scan on orders  (cost=12123.76..273959.40 rows=571109 width=20)
+                     Recheck Cond: ((o_orderdate >= '1994-03-01'::date) AND (o_orderdate < '1994-06-01'::date))
+                     ->  Bitmap Index Scan on orders_o_orderdate_o_orderkey_idx  (cost=0.00..11980.99 rows=571109 width=0)
+                           Index Cond: ((o_orderdate >= '1994-03-01'::date) AND (o_orderdate < '1994-06-01'::date))
+               ->  Hash  (cost=987933.17..987933.17 rows=1353986 width=4)
+                     ->  HashAggregate  (cost=974393.31..987933.17 rows=1353986 width=4)
+                           ->  Index Scan using lineitem_l_orderkey_idx_part1 on lineitem  (cost=0.00..924404.95 rows=19995345 width=4)
+(12 rows)
+
+COMMIT;
+COMMIT
